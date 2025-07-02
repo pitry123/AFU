@@ -23,6 +23,7 @@ namespace afu
 		explicit cyclicBuffer(size_t size)
 			: buffer(size), head(0), tail(0), capacity(size), full(false) {}
 
+
 		// Push data into the buffer
 		void push(const T& value) {
 			if (full) {
@@ -89,6 +90,22 @@ namespace afu
 				throw std::out_of_range("Index out of range!");
 			}
 			return buffer[(tail + index) % capacity];
+		}
+
+		T& front()
+		{
+			if (isEmpty()) 
+				throw std::out_of_range("Buffer is empty!");
+			
+			return buffer[tail];
+		}
+
+		const T& front()
+		{
+			if (isEmpty())
+				throw std::out_of_range("Buffer is empty!");
+
+			return buffer[tail];
 		}
 	};
 

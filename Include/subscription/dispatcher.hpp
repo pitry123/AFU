@@ -9,6 +9,7 @@
 #include <queue>
 #include <thread>
 #include <chrono>
+#include <interface/worker_interface.h>
 
 
 
@@ -36,9 +37,13 @@ namespace afu
 	};
 
 
-	class dispatcher : public std::enable_shared_from_this<dispatcher>
+	class dispatcher : public worker_interface
 	{
 	public:
+
+
+		dispatcher() = default;
+
 
 		virtual void add_action(const async_action_context& _action)
 		{
@@ -85,8 +90,22 @@ namespace afu
 				m_invoke_thread_cv.notify_all();
 			}
 		}
+		virtual void init() override
+		{
+			// TBD
+		}
 
-		virtual void start()
+		virtual void stop() override
+		{
+			m_still_running = false;
+			if (m_invoke_thread.joinable())
+			{
+				m_invoke_thread.join();
+			}
+		}
+
+
+		virtual void start() override
 		{
 			try
 			{

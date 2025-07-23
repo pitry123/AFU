@@ -118,11 +118,17 @@ namespace afu
 		public afu::async_action_context
 	{
 
-		std::function<void(const subscription_data& _data)> m_callback;
-		subscription_data m_data;
+		std::function<void(const std::shared_ptr<subscription_data>& _data)> m_callback;
+		std::shared_ptr<subscription_data> m_data;
 
 	public:
 		rowdata_async_action() = default;
+
+		rowdata_async_action(std::function<void(const std::shared_ptr<subscription_data>& _data)> _callback, std::shared_ptr<subscription_data> _data) :
+			m_callback(_callback),
+			m_data(_data)
+		{}
+
 
 
 
@@ -135,16 +141,9 @@ namespace afu
 			catch (const std::exception&)
 			{
 				throw std::runtime_error("callback exception\n");
-			}
-			
+			}	
 		}
-
-
-
 	};
-
-
-
 
 
 	class  subscriber : 
@@ -155,23 +154,41 @@ namespace afu
 		static constexpr int POOL_BUFFER_SIZE = 10;
 
 		std::shared_ptr<afu::cyclicBuffer<subscription_data>> m_pool_buffer;
+		std::queue<std::shared_ptr<subscription_data>> m_data_to_send;
 
 		size_t m_data_size;
 
-		std::map<std::thread::id, std::pair< std::shared_ptr<afu::dispatcher>, std::function<void(const subscription_data&)>>> m_subscription_map;
+		std::map<std::thread::id, std::pair< std::shared_ptr<afu::dispatcher>, std::function<void(const std::shared_ptr<subscription_data>&)>>> m_subscription_map;
 
-
+		std::condition_variable m_data_notify_cv;
+		std::mutex m_data_notify_mutex;
+		std::thread m_data_notify_th;
+		
+		bool m_is_runnning;
+		bool m_need_update;
 
 
 	public:
 
 		subscriber(size_t _data_size):
 			m_pool_buffer(new afu::cyclicBuffer<subscription_data>(POOL_BUFFER_SIZE)),
-			m_data_size(_data_size)
+			m_data_size(_data_size),
+			m_is_runnning(false),
+			m_need_update(false)
 
-		{}
+		{
+			m_data_notify_th = std::thread([&]()
+				{
+					m_is_runnning = true;
+					while (m_is_runnning)
+					{
+						notify();
+					}
+				}
+			);
+		}
 
-		virtual void subscribe(std::shared_ptr<afu::dispatcher> _disp, std::function<void(const subscription_data&)> _func) 
+		virtual void subscribe(std::shared_ptr<afu::dispatcher> _disp, std::function<void(const std::shared_ptr<subscription_data>&)> _func)
 		{
 			if (_disp == nullptr)
 				throw std::runtime_error("_disp == nullptr");
@@ -193,14 +210,39 @@ namespace afu
 		{
 			if (sizeof(T) != m_data_size)
 				throw std::invalid_argumenta("sizeof(T) != m_data_size");
-
-			m_pool_buffer->push(_val);
-			//Notify()
+			
+			auto v = std::make_shared<subscription_data>(sizeof(T));
+			v->write(_val);
+			{
+				std::lock_guard<std::mutex> lock(m_data_notify_mutex);
+				m_pool_buffer->push(*v);
+				m_data_to_send.push(v)
+			}
+			m_need_update = true;
+			m_data_notify_cv.notify_one();
 		}
 
 		void notify()
 		{
+			std::unique_lock<std::mutex> lock(m_data_notify_mutex);
+			m_data_notify_cv.wait(lock, [&]()
+				{
+					return m_need_update && (m_data_to_send.size() > 0);
+				});
+			
+			lock.unlock();
+			while (!m_data_to_send.empty())
+			{
+				auto subData =  m_data_to_send.front();
+				m_data_to_send.pop();
+				for (const auto& disp : m_subscription_map)
+				{
+					rowdata_async_action ac(disp.second.second, subData);
+					disp.second.first->begin_invoke(ac);
+				}
+			}
 
+			m_need_update = false;
 		}
 
 		template<typename T>

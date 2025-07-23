@@ -203,7 +203,6 @@ namespace afu
 			}
 			
 		}
-		
 
 		template<typename T>
 	    void write(const T& _val)

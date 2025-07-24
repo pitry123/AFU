@@ -2,7 +2,6 @@
 #include <communication/udp.hpp>	
 #include <chrono>
 #include <utils/event.hpp>
-#include <subscription/subscription.hpp>
 
 int main()
 {

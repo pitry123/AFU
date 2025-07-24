@@ -100,13 +100,6 @@ namespace afu
 			return buffer[tail];
 		}
 
-		const T& front()
-		{
-			if (isEmpty())
-				throw std::out_of_range("Buffer is empty!");
-
-			return buffer[tail];
-		}
 	};
 
 	template <typename T>

@@ -2,6 +2,7 @@
 #include <iostream>
 #include <mutex>
 #include <string>
+#include <stdexcept>
 #include <map>
 #include <vector>
 #include <utils/collection.hpp>
@@ -22,6 +23,9 @@ namespace afu
 
 		byte_vector m_buffer;
 
+	public:
+		subscription_data() : m_buffer(0){}
+
 
 		subscription_data(size_t _data_size) :
 			m_buffer(_data_size)
@@ -41,7 +45,6 @@ namespace afu
 			m_buffer(data, data + size)
 		{
 		}
-
 
 		// just for update (override data)
 		template<typename T>
@@ -73,11 +76,6 @@ namespace afu
 
 		void clear() noexcept { m_buffer.clear(); }
 
-
-	public:
-
-		friend class subscriber_interface;
-
 		//copyble read 
 		void read(void* _buffer, size_t _size)
 		{
@@ -108,9 +106,6 @@ namespace afu
 			val = read<T>();
 		}
 
-		std::shared_ptr<subscription_data> get_shared() {
-			return shared_from_this();
-		}
 	};
 
 
@@ -175,7 +170,6 @@ namespace afu
 			m_data_size(_data_size),
 			m_is_runnning(false),
 			m_need_update(false)
-
 		{
 			m_data_notify_th = std::thread([&]()
 				{
@@ -188,7 +182,10 @@ namespace afu
 			);
 		}
 
-		virtual void subscribe(std::shared_ptr<afu::dispatcher> _disp, std::function<void(const std::shared_ptr<subscription_data>&)> _func)
+		subscriber(const subscriber& other) = delete;
+
+
+		virtual void subscribe(afu::dispatcher* _disp, std::function<void(const std::shared_ptr<subscription_data>&)> _func)
 		{
 			if (_disp == nullptr)
 				throw std::runtime_error("_disp == nullptr");
@@ -196,10 +193,11 @@ namespace afu
 			if (_func == nullptr)
 				throw std::runtime_error("_disp == nullptr");
 
+			std::shared_ptr<afu::dispatcher> shared_disp(_disp, [](afu::dispatcher*) {});
 			auto disp_id = _disp->get_id();
 			if (m_subscription_map.find(disp_id) == m_subscription_map.end())
 			{
-				m_subscription_map[disp_id] = { _disp, _func };
+				m_subscription_map[disp_id] = { shared_disp, _func };
 			}
 			
 		}
@@ -208,14 +206,14 @@ namespace afu
 	    void write(const T& _val)
 		{
 			if (sizeof(T) != m_data_size)
-				throw std::invalid_argumenta("sizeof(T) != m_data_size");
+				throw std::invalid_argument("sizeof(T) != m_data_size");
 			
 			auto v = std::make_shared<subscription_data>(sizeof(T));
 			v->write(_val);
 			{
 				std::lock_guard<std::mutex> lock(m_data_notify_mutex);
 				m_pool_buffer->push(*v);
-				m_data_to_send.push(v)
+				m_data_to_send.push(v);
 			}
 			m_need_update = true;
 			m_data_notify_cv.notify_one();
@@ -236,7 +234,7 @@ namespace afu
 				m_data_to_send.pop();
 				for (const auto& disp : m_subscription_map)
 				{
-					rowdata_async_action ac(disp.second.second, subData);
+					std::shared_ptr<rowdata_async_action> ac = std::make_shared<rowdata_async_action >(disp.second.second, subData);
 					disp.second.first->begin_invoke(ac);
 				}
 			}
@@ -248,7 +246,7 @@ namespace afu
 		const T& get_last()
 		{
 			if (sizeof(T) != m_data_size)
-				throw std::invalid_argumenta("sizeof(T) != m_data_size");
+				throw std::invalid_argument("sizeof(T) != m_data_size");
 			
 			return m_pool_buffer->front().read<T>();
 		}
@@ -258,7 +256,7 @@ namespace afu
 		const T& get_last_i()
 		{
 			if (sizeof(T) != m_data_size)
-				throw std::invalid_argumenta("sizeof(T) != m_data_size");
+				throw std::invalid_argument("sizeof(T) != m_data_size");
 
 			return m_pool_buffer->front().read<T>();
 		}
@@ -267,11 +265,4 @@ namespace afu
 
 	};
 
-
-
-
-
-
-
-	
 }

@@ -10,7 +10,7 @@
 
 namespace afu
 {
-	class dispatcher_base : public dispatcher 
+	class dispatcher_base : public dispatcher, public std::enable_shared_from_this<dispatcher_base>
 	{
 
 	public:
@@ -19,7 +19,7 @@ namespace afu
 		{
 			if (_sub == nullptr || _callback == nullptr)
 				return false;
-			
+
 			_sub->subscribe(this, _callback);
 			return true;
 		}

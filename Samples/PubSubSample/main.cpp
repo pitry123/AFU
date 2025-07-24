@@ -2,11 +2,7 @@
 #include <chrono>
 #include <string>
 #include <sstream>
-
 #include <utils/dispatcher_base.hpp>
-#include <cstdlib> // For rand() and srand()
-#include <ctime>   // For time()
-
 
 struct person_one
 {
@@ -62,7 +58,7 @@ int main()
 	std::vector<bool> a2 = { false, true, true};
 
 	std::cout << "Start\n";
-	afu::subscriber sub(sizeof(person_one));
+	std::shared_ptr<afu::subscriber> sub = std::make_shared<afu::subscriber>( sizeof(person_one));
 
 	sample_one_disp a(sub);
 	a.init();
@@ -71,12 +67,9 @@ int main()
 	int ind = 0;
 	while (true)
 	{
-		
-// 		char t[30];
-// 		std::strcpy(t, a[ind]);
 		person_one p = {"aa", a1[ind], a2[ind]};
-		ind = (ind++) % 3;
-		sub.write(p);
+		ind = (++ind) % 3;
+		sub->write(p);
 		std::this_thread::sleep_for(_duration);
 	}
 	a.stop();

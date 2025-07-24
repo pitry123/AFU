@@ -17,8 +17,7 @@
 namespace afu
 {
 
-	class async_action_context :
-		std::enable_shared_from_this<async_action_context>
+	class async_action_context 
 	{
 	public:
 		async_action_context() = default;
@@ -45,11 +44,10 @@ namespace afu
 		dispatcher() = default;
 
 
-		virtual void add_action(const async_action_context& _action)
+		virtual void add_action(const std::shared_ptr<async_action_context>& _action)
 		{
 			std::lock_guard<std::mutex> lock(m_lock_invoke_thread);
-			std::shared_ptr<async_action_context> ac = std::make_shared<async_action_context>(_action);
-			m_action_q.push(ac);
+			m_action_q.push(_action);
 		}
 
 		virtual void add_list_action(const std::vector<std::shared_ptr<async_action_context>>& _action)
@@ -80,7 +78,7 @@ namespace afu
 			}
 		}
 
-		void begin_invoke(const async_action_context& _action)
+		void begin_invoke(const std::shared_ptr<async_action_context>& _action)
 		{
 			add_action(_action);
 			if (m_invoke_thread.joinable() && 

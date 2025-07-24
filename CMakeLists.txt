@@ -27,4 +27,4 @@ include_directories(${Boost_INCLUDE_DIRS})
 # Add each sample executable
 add_subdirectory(Samples/UdpSample)
 add_subdirectory(Samples/TcpSample)
-add_subdirectory(Samples/BuilderSample)
+add_subdirectory(Samples/PubSubSample)

@@ -135,6 +135,12 @@ namespace afu
 			}
 		}
 
+        virtual void join()
+        {
+            if (m_invoke_thread.joinable())
+                m_invoke_thread.join();
+        }
+
 		std::thread::id get_id()
 		{
 			if (m_invoke_thread.joinable())
